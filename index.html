@@ -20,28 +20,37 @@
         body {
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+            overflow: hidden; /* Prevents bouncing/scrolling on mobile */
             background-color: #222;
             font-family: Arial, sans-serif;
-            touch-action: none; /* Prevents screen scrolling on mobile taps */
+            touch-action: none; /* Prevents default touch actions */
         }
         canvas {
+            display: block;
             background-color: #70c5ce; /* Sky blue */
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            border: 2px solid #333;
+            /* Force canvas to take up the whole screen */
+            width: 100vw;
+            height: 100vh;
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="320" height="480"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
+
+        // Make canvas dynamically fit the user's screen size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Handle device rotation or resizing
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
 
         // Game Variables
         let frames = 0;
@@ -51,12 +60,12 @@
 
         // Bird Object
         const bird = {
-            x: 50, 
-            y: 150, 
-            width: 20, 
-            height: 20,
-            gravity: 0.3, 
-            jump: 5.5, 
+            x: canvas.width * 0.2, // Keep bird 20% from the left edge
+            y: canvas.height / 2, 
+            width: 24, 
+            height: 24,
+            gravity: 0.35, 
+            jump: 6.5, 
             speed: 0,
             
             draw: function() {
@@ -65,7 +74,7 @@
                 
                 // Bird eye
                 ctx.fillStyle = "black";
-                ctx.fillRect(this.x + 12, this.y + 4, 4, 4);
+                ctx.fillRect(this.x + 16, this.y + 4, 4, 4);
             },
             
             update: function() {
@@ -76,7 +85,7 @@
                     // Floor collision
                     if (this.y + this.height >= canvas.height) {
                         this.y = canvas.height - this.height;
-                        currentState = 2; // Game Over state
+                        currentState = 2; // Game Over
                     }
                     // Ceiling collision
                     if (this.y <= 0) {
@@ -94,9 +103,9 @@
         // Pipes Object
         const pipes = {
             position: [],
-            width: 40,
-            gap: 110,
-            dx: 2.5,
+            width: 50,
+            gap: 150, // Slightly larger gap for mobile playability
+            dx: 3, // Scroll speed
             
             draw: function() {
                 for (let i = 0; i < this.position.length; i++) {
@@ -105,22 +114,20 @@
                     let bottomY = p.y + this.gap;
 
                     ctx.fillStyle = "#228B22"; // Green pipes
-                    // Top pipe
-                    ctx.fillRect(p.x, 0, this.width, topY);
-                    // Bottom pipe
-                    ctx.fillRect(p.x, bottomY, this.width, canvas.height - bottomY);
+                    ctx.fillRect(p.x, 0, this.width, topY); // Top pipe
+                    ctx.fillRect(p.x, bottomY, this.width, canvas.height - bottomY); // Bottom pipe
                 }
             },
             
             update: function() {
                 if (currentState !== 1) return;
 
-                // Add new pipes every 90 frames
-                if (frames % 90 === 0) {
+                // Add new pipes every 100 frames
+                if (frames % 100 === 0) {
                     this.position.push({
                         x: canvas.width,
-                        // Randomize gap position
-                        y: Math.random() * (canvas.height - this.gap - 60) + 30 
+                        // Randomize gap keeping it within dynamic screen bounds
+                        y: Math.random() * (canvas.height - this.gap - 100) + 50 
                     });
                 }
 
@@ -128,7 +135,7 @@
                     let p = this.position[i];
                     p.x -= this.dx;
 
-                    // Remove pipes that move off screen and increment score
+                    // Remove pipes that move off screen
                     if (p.x + this.width <= 0) {
                         this.position.shift();
                         score++;
@@ -137,11 +144,11 @@
                         continue;
                     }
 
-                    // Collision detection with bird
+                    // Collision detection
                     let bottomY = p.y + this.gap;
                     if (bird.x + bird.width > p.x && bird.x < p.x + this.width &&
                         (bird.y < p.y || bird.y + bird.height > bottomY)) {
-                        currentState = 2; // Hit a pipe -> Game Over
+                        currentState = 2; // Game Over
                     }
                 }
             },
@@ -153,46 +160,47 @@
 
         // Draw Everything
         function draw() {
-            // Clear canvas / draw background
             ctx.fillStyle = "#70c5ce"; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             pipes.draw();
             bird.draw();
 
-            // UI / Text formatting
+            // UI
             ctx.fillStyle = "white";
             ctx.strokeStyle = "black";
             ctx.lineWidth = 2;
-            ctx.font = "bold 24px Arial";
             ctx.textAlign = "center";
 
+            // Dynamically center text based on screen size
             if (currentState === 0) {
-                ctx.fillText("TAP TO START", canvas.width / 2, 240);
-                ctx.strokeText("TAP TO START", canvas.width / 2, 240);
+                ctx.font = "bold 28px Arial";
+                ctx.fillText("TAP TO START", canvas.width / 2, canvas.height / 2 - 50);
+                ctx.strokeText("TAP TO START", canvas.width / 2, canvas.height / 2 - 50);
             } else if (currentState === 1) {
-                ctx.font = "bold 36px Arial";
-                ctx.fillText(score, canvas.width / 2, 50);
-                ctx.strokeText(score, canvas.width / 2, 50);
+                ctx.font = "bold 40px Arial";
+                ctx.fillText(score, canvas.width / 2, 80);
+                ctx.strokeText(score, canvas.width / 2, 80);
             } else if (currentState === 2) {
-                ctx.fillText("GAME OVER", canvas.width / 2, 200);
-                ctx.strokeText("GAME OVER", canvas.width / 2, 200);
+                ctx.font = "bold 32px Arial";
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 60);
+                ctx.strokeText("GAME OVER", canvas.width / 2, canvas.height / 2 - 60);
                 
-                ctx.font = "bold 18px Arial";
-                ctx.fillText("Score: " + score, canvas.width / 2, 240);
-                ctx.fillText("Best: " + bestScore, canvas.width / 2, 270);
+                ctx.font = "bold 22px Arial";
+                ctx.fillText("Score: " + score, canvas.width / 2, canvas.height / 2 - 10);
+                ctx.fillText("Best: " + bestScore, canvas.width / 2, canvas.height / 2 + 20);
                 
-                ctx.fillText("TAP TO RESTART", canvas.width / 2, 320);
+                ctx.font = "bold 20px Arial";
+                ctx.fillText("TAP TO RESTART", canvas.width / 2, canvas.height / 2 + 80);
+                ctx.strokeText("TAP TO RESTART", canvas.width / 2, canvas.height / 2 + 80);
             }
         }
 
-        // Update Game Logic
         function update() {
             bird.update();
             pipes.update();
         }
 
-        // Game Loop
         function loop() {
             update();
             draw();
@@ -200,27 +208,37 @@
             requestAnimationFrame(loop);
         }
 
-        // Input Handling (Click, Tap, or Spacebar)
         function handleInput() {
             if (currentState === 0) {
-                currentState = 1; // Start game
+                currentState = 1; 
                 bird.flap();
             } else if (currentState === 1) {
-                bird.flap(); // Flap while playing
+                bird.flap(); 
             } else if (currentState === 2) {
+                
+                // --- AD TRIGGER LOGIC ---
+                // Attempts to show the ad when the user restarts the game
+                if (window.TelegramAdsController && typeof window.TelegramAdsController.showAd === 'function') {
+                    try {
+                        window.TelegramAdsController.showAd();
+                    } catch(e) {
+                        console.error("Ad failed to trigger:", e);
+                    }
+                }
+
                 // Restart game logic
                 currentState = 0;
                 pipes.reset();
                 bird.speed = 0;
-                bird.y = 150;
+                bird.y = canvas.height / 2;
                 score = 0;
             }
         }
 
-        // Event Listeners for controls
+        // Input Listeners
         canvas.addEventListener("mousedown", handleInput);
         canvas.addEventListener("touchstart", function(e) {
-            e.preventDefault(); // Prevent accidental scrolling
+            e.preventDefault(); 
             handleInput();
         }, {passive: false});
         
@@ -229,6 +247,13 @@
                 handleInput();
             }
         });
+
+        // --- TELEGRAM INIT LOGIC ---
+        // Tells Telegram the app is fully loaded and expands the view
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
 
         // Start the loop
         loop();
